@@ -1,3 +1,8 @@
+using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Mvc;
+using PropiedadesMinimalAPI.Data;
+using PropiedadesMinimalAPI.Models;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
@@ -14,31 +19,56 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+//EndPoints
+
+app.MapGet("/api/Properties", (ILogger<Program> logger) =>
+{
+    logger.LogInformation("Dependency injections");
+    return Results.Ok(PropertyData.properties);
+}).WithName("GetProperties").Produces<IEnumerable<PropertyDTO>>(200);
+app.MapGet("/api/Properties/{id:int}", ([FromRoute] int id) =>
+{
+    return Results.Ok(PropertyData.properties.FirstOrDefault(prt => prt.IdPropiedad == id));
+}).WithName("GetProperty").Produces<Property>(200);
+app.MapPost("/api/Properties", ([FromBody] PropertyCreateDTO propertyCreateDTO ) =>
+{
+    if(string.IsNullOrEmpty(propertyCreateDTO.NombrePropiedad))
+    {
+        return Results.BadRequest("IdPropiedad incorrecto o nombre vacio");
+    }
+
+    if(PropertyData.properties.FirstOrDefault(prt => prt.NombrePropiedad.ToLower() == propertyCreateDTO.NombrePropiedad.ToLower()) != null)
+    {
+        return Results.BadRequest("Ya existe una propiedad con ese nombre");
+    }
+
+    //propertyCreateDTO.IdPropiedad = PropertyData.properties.OrderByDescending(prt => prt.IdPropiedad).First().IdPropiedad + 1;
+
+    Property property = new Property()
+    {
+        IdPropiedad = PropertyData.properties.OrderByDescending(prt => prt.IdPropiedad).First().IdPropiedad + 1,
+        NombrePropiedad = propertyCreateDTO.NombrePropiedad,
+        Descripcion = propertyCreateDTO.Descripcion,
+        Ubicacion = propertyCreateDTO.Ubicacion,
+        Activa = propertyCreateDTO.Activa,
+        FechaCreacion = DateTime.Now
+    };
+
+    PropertyData.properties.Add(property);
+
+
+    PropertyDTO propertyDTO = new PropertyDTO()
+    {
+        IdPropiedad = property.IdPropiedad,
+        NombrePropiedad = property.NombrePropiedad,
+        Descripcion = property.Descripcion,
+        Ubicacion = property.Ubicacion,
+        Activa = property.Activa
+    };
+
+    return Results.CreatedAtRoute("GetProperty", new {id = propertyDTO.IdPropiedad}, propertyDTO);
+}).WithName("PostProperty").Accepts<PropertyDTO>("application/json").Produces<PropertyDTO>(2001).Produces(400);
+    
+
 app.UseHttpsRedirection();
-
-var summaries = new[]
-{
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
-
-app.MapGet("/weatherforecast", () =>
-{
-    var forecast = Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-})
-.WithName("GetWeatherForecast")
-.WithOpenApi();
-
 app.Run();
-
-internal record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}
