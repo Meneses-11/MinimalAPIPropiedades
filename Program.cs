@@ -6,6 +6,7 @@ using PropiedadesMinimalAPI.Data;
 using PropiedadesMinimalAPI.Mapper;
 using PropiedadesMinimalAPI.Models;
 using PropiedadesMinimalAPI.Validaciones;
+using System.Net;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -28,27 +29,49 @@ if (app.Environment.IsDevelopment())
 
 //EndPoints
 
-app.MapGet("/api/Properties", (ILogger<Program> logger) =>
+app.MapGet("/api/Properties", (ILogger<Program> logger, IMapper mapper) =>
 {
     logger.LogInformation("Dependency injections");
-    return Results.Ok(PropertyData.properties);
-}).WithName("GetProperties").Produces<IEnumerable<PropertyDTO>>(200);
-app.MapGet("/api/Properties/{id:int}", ([FromRoute] int id) =>
+
+    return Results.Ok(new APIResponse
+    {
+        Success = true,
+        Data = PropertyData.properties.Select(prpt => mapper.Map<PropertyDTO>(prpt)).ToList(),
+        StatusCode = HttpStatusCode.OK
+    });
+
+}).WithName("GetProperties").Produces<IEnumerable<APIResponse>>(200);
+
+app.MapGet("/api/Properties/{id:int}", (IMapper mapper, [FromRoute] int id) =>
 {
-    return Results.Ok(PropertyData.properties.FirstOrDefault(prt => prt.IdPropiedad == id));
-}).WithName("GetProperty").Produces<Property>(200);
-app.MapPost("/api/Properties", (IMapper mapper, IValidator<PropertyCreateDTO> validation, [FromBody] PropertyCreateDTO propertyCreateDTO ) =>
+    return Results.Ok(new APIResponse
+    {
+        Success = true,
+        Data = mapper.Map<PropertyDTO>(PropertyData.properties.FirstOrDefault(prt => prt.IdPropiedad == id)),
+        StatusCode = HttpStatusCode.OK
+    });
+}).WithName("GetProperty").Produces<APIResponse>(200);
+
+app.MapPost("/api/Properties", async (IMapper mapper, IValidator<PropertyCreateDTO> validation, [FromBody] PropertyCreateDTO propertyCreateDTO ) =>
 {
-    var resultValidations = validation.ValidateAsync(propertyCreateDTO).GetAwaiter().GetResult();
+    APIResponse result = new APIResponse() { Errors = [] };
+
+    var resultValidations = await validation.ValidateAsync(propertyCreateDTO);
 
     if (!resultValidations.IsValid)
     {
-        return Results.BadRequest(resultValidations.Errors.FirstOrDefault().ToString());
+        result.Success = false;
+        result.Errors.Add(resultValidations.Errors.FirstOrDefault().ToString());
+        result.StatusCode = HttpStatusCode.BadRequest;
+        return Results.BadRequest(result);
     }
 
     if(PropertyData.properties.FirstOrDefault(prt => prt.NombrePropiedad.ToLower() == propertyCreateDTO.NombrePropiedad.ToLower()) != null)
     {
-        return Results.BadRequest("Ya existe una propiedad con ese nombre");
+        result.Success = false;
+        result.Errors.Add("Ya existe una propiedad con ese nombre");
+        result.StatusCode = HttpStatusCode.BadRequest;
+        return Results.BadRequest(result);
     }
 
     Property property = mapper.Map<Property>(propertyCreateDTO);
@@ -60,8 +83,14 @@ app.MapPost("/api/Properties", (IMapper mapper, IValidator<PropertyCreateDTO> va
 
     PropertyDTO propertyDTO = mapper.Map<PropertyDTO>(property);
 
-    return Results.CreatedAtRoute("GetProperty", new {id = propertyDTO.IdPropiedad}, propertyDTO);
-}).WithName("PostProperty").Accepts<PropertyDTO>("application/json").Produces<PropertyDTO>(2001).Produces(400);
+    //return Results.CreatedAtRoute("GetProperty", new {id = propertyDTO.IdPropiedad}, propertyDTO);
+
+    result.Success = true;
+    result.Data = propertyDTO;
+    result.StatusCode = HttpStatusCode.Created;
+    return Results.Ok(result);
+
+}).WithName("PostProperty").Accepts<APIResponse>("application/json").Produces<PropertyDTO>(2001).Produces(400);
     
 
 app.UseHttpsRedirection();
