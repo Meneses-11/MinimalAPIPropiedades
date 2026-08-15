@@ -36,30 +36,28 @@ if (app.Environment.IsDevelopment())
 
 //EndPoints
 
-app.MapGet("/api/Properties", (ILogger<Program> logger, IMapper mapper) =>
+app.MapGet("/api/Properties", async (PropertiesDBContext _db, IMapper mapper) =>
 {
-    logger.LogInformation("Dependency injections");
-
     return Results.Ok(new APIResponse
     {
         Success = true,
-        Data = PropertyData.properties.Select(prpt => mapper.Map<PropertyDTO>(prpt)).ToList(),
+        Data = _db.Property.Select(prpt => mapper.Map<PropertyDTO>(prpt)).ToList(),
         StatusCode = HttpStatusCode.OK
     });
 
 }).WithName("GetProperties").Produces<IEnumerable<APIResponse>>(200);
 
-app.MapGet("/api/Properties/{id:int}", (IMapper mapper, [FromRoute] int id) =>
+app.MapGet("/api/Properties/{id:int}", async (PropertiesDBContext _db, IMapper mapper, [FromRoute] int id) =>
 {
     return Results.Ok(new APIResponse
     {
         Success = true,
-        Data = mapper.Map<PropertyDTO>(PropertyData.properties.FirstOrDefault(prt => prt.IdPropiedad == id)),
+        Data = mapper.Map<PropertyDTO>(await _db.Property.FirstOrDefaultAsync(prt => prt.IdPropiedad == id)),
         StatusCode = HttpStatusCode.OK
     });
 }).WithName("GetProperty").Produces<APIResponse>(200);
 
-app.MapPost("/api/Properties", async (IMapper mapper, IValidator<PropertyCreateDTO> validation, [FromBody] PropertyCreateDTO propertyCreateDTO ) =>
+app.MapPost("/api/Properties", async (PropertiesDBContext _db, IMapper mapper, IValidator<PropertyCreateDTO> validation, [FromBody] PropertyCreateDTO propertyCreateDTO ) =>
 {
     APIResponse result = new APIResponse() { Errors = [] };
 
@@ -73,7 +71,7 @@ app.MapPost("/api/Properties", async (IMapper mapper, IValidator<PropertyCreateD
         return Results.BadRequest(result);
     }
 
-    if(PropertyData.properties.FirstOrDefault(prt => prt.NombrePropiedad.ToLower() == propertyCreateDTO.NombrePropiedad.ToLower()) != null)
+    if((await _db.Property.FirstOrDefaultAsync(prt => prt.NombrePropiedad.ToLower() == propertyCreateDTO.NombrePropiedad.ToLower())) != null)
     {
         result.Success = false;
         result.Errors.Add("Ya existe una propiedad con ese nombre");
@@ -82,11 +80,10 @@ app.MapPost("/api/Properties", async (IMapper mapper, IValidator<PropertyCreateD
     }
 
     Property property = mapper.Map<Property>(propertyCreateDTO);
-    property.IdPropiedad = PropertyData.properties.OrderByDescending(prt => prt.IdPropiedad).First().IdPropiedad + 1;
     property.FechaCreacion = DateTime.Now;
 
-    PropertyData.properties.Add(property);
-
+    await _db.Property.AddAsync(property);
+    await _db.SaveChangesAsync();
 
     PropertyDTO propertyDTO = mapper.Map<PropertyDTO>(property);
 
@@ -99,7 +96,7 @@ app.MapPost("/api/Properties", async (IMapper mapper, IValidator<PropertyCreateD
 
 }).WithName("PostProperty").Accepts<PropertyCreateDTO>("application/json").Produces<APIResponse>(201).Produces(400);
 
-app.MapPut("/api/Properties", async (IMapper mapper, IValidator<PropertyUpdateDTO> validation, [FromBody] PropertyUpdateDTO propertyUpdateDTO) =>
+app.MapPut("/api/Properties", async (PropertiesDBContext _db, IMapper mapper, IValidator<PropertyUpdateDTO> validation, [FromBody] PropertyUpdateDTO propertyUpdateDTO) =>
 {
     APIResponse result = new APIResponse() { Errors = [] };
 
@@ -113,7 +110,7 @@ app.MapPut("/api/Properties", async (IMapper mapper, IValidator<PropertyUpdateDT
         return Results.BadRequest(result);
     }
 
-    Property propertyBD = PropertyData.properties.FirstOrDefault(prpt => prpt.IdPropiedad == propertyUpdateDTO.IdPropiedad);
+    Property propertyBD = await _db.Property.FirstOrDefaultAsync(prpt => prpt.IdPropiedad == propertyUpdateDTO.IdPropiedad);
 
     if(propertyBD == null)
     {
@@ -128,6 +125,8 @@ app.MapPut("/api/Properties", async (IMapper mapper, IValidator<PropertyUpdateDT
     propertyBD.Ubicacion = propertyUpdateDTO.Ubicacion;
     propertyBD.Activa = propertyUpdateDTO.Activa;
 
+    await _db.SaveChangesAsync();
+
     PropertyDTO propertyDTO = mapper.Map<PropertyDTO>(propertyBD);
 
     result.Success = true;
@@ -137,11 +136,11 @@ app.MapPut("/api/Properties", async (IMapper mapper, IValidator<PropertyUpdateDT
 
 }).WithName("PutProperty").Accepts<PropertyUpdateDTO>("application/json").Produces<APIResponse>(200).Produces(400).Produces(404);
 
-app.MapDelete("/api/Propierties/{id:int}", ([FromRoute] int id) =>
+app.MapDelete("/api/Propierties/{id:int}", async (PropertiesDBContext _db, [FromRoute] int id) =>
 {
     APIResponse result = new APIResponse { Errors = [] };
 
-    Property propertyDB = PropertyData.properties.FirstOrDefault(prpt => prpt.IdPropiedad == id);
+    Property propertyDB = await _db.Property.FirstOrDefaultAsync(prpt => prpt.IdPropiedad == id);
 
     if (propertyDB == null)
     {
@@ -151,7 +150,8 @@ app.MapDelete("/api/Propierties/{id:int}", ([FromRoute] int id) =>
         return Results.NotFound(result);
     }
 
-    PropertyData.properties.Remove(propertyDB);
+    _db.Remove(propertyDB);
+    await _db.SaveChangesAsync();
 
     result.Success = true;
     result.StatusCode = HttpStatusCode.NoContent;
