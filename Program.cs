@@ -1,9 +1,11 @@
 using AutoMapper;
+using FluentValidation;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using PropiedadesMinimalAPI.Data;
 using PropiedadesMinimalAPI.Mapper;
 using PropiedadesMinimalAPI.Models;
+using PropiedadesMinimalAPI.Validaciones;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -13,6 +15,7 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 builder.Services.AddAutoMapper(map => map.AddMaps(typeof(PropertiesMapper)));
+builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 
 var app = builder.Build();
 
@@ -34,11 +37,13 @@ app.MapGet("/api/Properties/{id:int}", ([FromRoute] int id) =>
 {
     return Results.Ok(PropertyData.properties.FirstOrDefault(prt => prt.IdPropiedad == id));
 }).WithName("GetProperty").Produces<Property>(200);
-app.MapPost("/api/Properties", (IMapper mapper, [FromBody] PropertyCreateDTO propertyCreateDTO ) =>
+app.MapPost("/api/Properties", (IMapper mapper, IValidator<PropertyCreateDTO> validation, [FromBody] PropertyCreateDTO propertyCreateDTO ) =>
 {
-    if(string.IsNullOrEmpty(propertyCreateDTO.NombrePropiedad))
+    var resultValidations = validation.ValidateAsync(propertyCreateDTO).GetAwaiter().GetResult();
+
+    if (!resultValidations.IsValid)
     {
-        return Results.BadRequest("IdPropiedad incorrecto o nombre vacio");
+        return Results.BadRequest(resultValidations.Errors.FirstOrDefault().ToString());
     }
 
     if(PropertyData.properties.FirstOrDefault(prt => prt.NombrePropiedad.ToLower() == propertyCreateDTO.NombrePropiedad.ToLower()) != null)
@@ -46,17 +51,6 @@ app.MapPost("/api/Properties", (IMapper mapper, [FromBody] PropertyCreateDTO pro
         return Results.BadRequest("Ya existe una propiedad con ese nombre");
     }
 
-    //propertyCreateDTO.IdPropiedad = PropertyData.properties.OrderByDescending(prt => prt.IdPropiedad).First().IdPropiedad + 1;
-
-    /*Property property = new Property()
-    {
-        IdPropiedad = PropertyData.properties.OrderByDescending(prt => prt.IdPropiedad).First().IdPropiedad + 1,
-        NombrePropiedad = propertyCreateDTO.NombrePropiedad,
-        Descripcion = propertyCreateDTO.Descripcion,
-        Ubicacion = propertyCreateDTO.Ubicacion,
-        Activa = propertyCreateDTO.Activa,
-        FechaCreacion = DateTime.Now
-    };*/
     Property property = mapper.Map<Property>(propertyCreateDTO);
     property.IdPropiedad = PropertyData.properties.OrderByDescending(prt => prt.IdPropiedad).First().IdPropiedad + 1;
     property.FechaCreacion = DateTime.Now;
