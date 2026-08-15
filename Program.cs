@@ -2,6 +2,7 @@ using AutoMapper;
 using FluentValidation;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using PropiedadesMinimalAPI.Data;
 using PropiedadesMinimalAPI.Mapper;
 using PropiedadesMinimalAPI.Models;
@@ -15,6 +16,11 @@ var builder = WebApplication.CreateBuilder(args);
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+builder.Services.AddDbContext<PropertiesDBContext>(options =>
+{
+    options.UseSqlServer(builder.Configuration.GetConnectionString("ConnectionLocalSQL"));
+});
 
 builder.Services.AddAutoMapper(map => map.AddMaps(typeof(PropertiesMapper)));
 builder.Services.AddValidatorsFromAssemblyContaining<Program>();
