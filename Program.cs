@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using PropiedadesMinimalAPI.Data;
 using PropiedadesMinimalAPI.Mapper;
 using PropiedadesMinimalAPI.Models;
+using PropiedadesMinimalAPI.Models.DTO;
 using PropiedadesMinimalAPI.Validaciones;
 using System.Net;
 
@@ -90,8 +91,67 @@ app.MapPost("/api/Properties", async (IMapper mapper, IValidator<PropertyCreateD
     result.StatusCode = HttpStatusCode.Created;
     return Results.Ok(result);
 
-}).WithName("PostProperty").Accepts<APIResponse>("application/json").Produces<PropertyDTO>(2001).Produces(400);
-    
+}).WithName("PostProperty").Accepts<PropertyCreateDTO>("application/json").Produces<APIResponse>(201).Produces(400);
+
+app.MapPut("/api/Properties", async (IMapper mapper, IValidator<PropertyUpdateDTO> validation, [FromBody] PropertyUpdateDTO propertyUpdateDTO) =>
+{
+    APIResponse result = new APIResponse() { Errors = [] };
+
+    var resultValidations = await validation.ValidateAsync(propertyUpdateDTO);
+
+    if (!resultValidations.IsValid)
+    {
+        result.Success = false;
+        result.Errors.Add(resultValidations.Errors.FirstOrDefault().ToString());
+        result.StatusCode = HttpStatusCode.BadRequest;
+        return Results.BadRequest(result);
+    }
+
+    Property propertyBD = PropertyData.properties.FirstOrDefault(prpt => prpt.IdPropiedad == propertyUpdateDTO.IdPropiedad);
+
+    if(propertyBD == null)
+    {
+        result.Success = false;
+        result.Errors.Add("No se encontro ninguna propiedad con ese ID");
+        result.StatusCode = HttpStatusCode.NotFound;
+        return Results.NotFound(result);
+    }
+
+    propertyBD.NombrePropiedad = propertyUpdateDTO.NombrePropiedad;
+    propertyBD.Descripcion = propertyUpdateDTO.Descripcion;
+    propertyBD.Ubicacion = propertyUpdateDTO.Ubicacion;
+    propertyBD.Activa = propertyUpdateDTO.Activa;
+
+    PropertyDTO propertyDTO = mapper.Map<PropertyDTO>(propertyBD);
+
+    result.Success = true;
+    result.Data = propertyDTO;
+    result.StatusCode = HttpStatusCode.Created;
+    return Results.Ok(result);
+
+}).WithName("PutProperty").Accepts<PropertyUpdateDTO>("application/json").Produces<APIResponse>(200).Produces(400).Produces(404);
+
+app.MapDelete("/api/Propierties/{id:int}", ([FromRoute] int id) =>
+{
+    APIResponse result = new APIResponse { Errors = [] };
+
+    Property propertyDB = PropertyData.properties.FirstOrDefault(prpt => prpt.IdPropiedad == id);
+
+    if (propertyDB == null)
+    {
+        result.Success = false;
+        result.Errors.Add("No se encontro ninguna propiedad con ese ID");
+        result.StatusCode = HttpStatusCode.NotFound;
+        return Results.NotFound(result);
+    }
+
+    PropertyData.properties.Remove(propertyDB);
+
+    result.Success = true;
+    result.StatusCode = HttpStatusCode.NoContent;
+    return Results.Ok(result);
+
+}).WithName("DeleteProperty").Produces<APIResponse>(204).Produces(400).Produces(404);
 
 app.UseHttpsRedirection();
 app.Run();

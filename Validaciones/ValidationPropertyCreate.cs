@@ -1,5 +1,5 @@
 ﻿using FluentValidation;
-using PropiedadesMinimalAPI.Models;
+using PropiedadesMinimalAPI.Models.DTO;
 
 namespace PropiedadesMinimalAPI.Validaciones;
 

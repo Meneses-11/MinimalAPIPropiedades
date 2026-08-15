@@ -1,6 +1,6 @@
-﻿namespace PropiedadesMinimalAPI.Models;
+﻿namespace PropiedadesMinimalAPI.Models.DTO;
 
-public class PropertyDTO
+public class PropertyUpdateDTO
 {
     public int IdPropiedad { get; set; }
     public string NombrePropiedad { get; set; }

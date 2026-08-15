@@ -1,5 +1,6 @@
 ﻿using AutoMapper;
 using PropiedadesMinimalAPI.Models;
+using PropiedadesMinimalAPI.Models.DTO;
 
 namespace PropiedadesMinimalAPI.Mapper;
 

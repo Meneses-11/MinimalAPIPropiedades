@@ -1,4 +1,4 @@
-﻿namespace PropiedadesMinimalAPI.Models;
+﻿namespace PropiedadesMinimalAPI.Models.DTO;
 
 public class PropertyCreateDTO
 {
