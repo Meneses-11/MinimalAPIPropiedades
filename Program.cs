@@ -49,13 +49,30 @@ app.MapGet("/api/Properties", async (PropertiesDBContext _db, IMapper mapper) =>
 
 app.MapGet("/api/Properties/{id:int}", async (PropertiesDBContext _db, IMapper mapper, [FromRoute] int id) =>
 {
-    return Results.Ok(new APIResponse
+    APIResponse result = new APIResponse() { Errors = [] };
+
+    if (id <= 0)
     {
-        Success = true,
-        Data = mapper.Map<PropertyDTO>(await _db.Property.FirstOrDefaultAsync(prt => prt.IdPropiedad == id)),
-        StatusCode = HttpStatusCode.OK
-    });
-}).WithName("GetProperty").Produces<APIResponse>(200);
+        result.Success = false;
+        result.Errors.Add("Invalid Id");
+        result.StatusCode = HttpStatusCode.BadRequest;
+        return Results.BadRequest(result);
+    }
+
+    Property? property = await _db.Property.FirstOrDefaultAsync(prt => prt.IdPropiedad == id);
+
+    if(property == null)
+    {
+        result.Success = false;
+        result.Errors.Add("No property was found");
+        result.StatusCode = HttpStatusCode.NotFound;
+        return Results.NotFound(result);
+    }
+
+    result.Success = true;
+    result.Data = mapper.Map<PropertyDTO>(property);
+    return Results.Ok(result);
+}).WithName("GetProperty").Produces<APIResponse>(200).Produces<APIResponse>(400).Produces<APIResponse>(404);
 
 app.MapPost("/api/Properties", async (PropertiesDBContext _db, IMapper mapper, IValidator<PropertyCreateDTO> validation, [FromBody] PropertyCreateDTO propertyCreateDTO ) =>
 {
@@ -66,7 +83,7 @@ app.MapPost("/api/Properties", async (PropertiesDBContext _db, IMapper mapper, I
     if (!resultValidations.IsValid)
     {
         result.Success = false;
-        result.Errors.Add(resultValidations.Errors.FirstOrDefault().ToString());
+        result.Errors.Add(resultValidations?.Errors?.FirstOrDefault()?.ToString() ?? "");
         result.StatusCode = HttpStatusCode.BadRequest;
         return Results.BadRequest(result);
     }
@@ -74,7 +91,7 @@ app.MapPost("/api/Properties", async (PropertiesDBContext _db, IMapper mapper, I
     if((await _db.Property.FirstOrDefaultAsync(prt => prt.NombrePropiedad.ToLower() == propertyCreateDTO.NombrePropiedad.ToLower())) != null)
     {
         result.Success = false;
-        result.Errors.Add("Ya existe una propiedad con ese nombre");
+        result.Errors.Add("A property with that name already exist");
         result.StatusCode = HttpStatusCode.BadRequest;
         return Results.BadRequest(result);
     }
@@ -87,14 +104,12 @@ app.MapPost("/api/Properties", async (PropertiesDBContext _db, IMapper mapper, I
 
     PropertyDTO propertyDTO = mapper.Map<PropertyDTO>(property);
 
-    //return Results.CreatedAtRoute("GetProperty", new {id = propertyDTO.IdPropiedad}, propertyDTO);
-
     result.Success = true;
     result.Data = propertyDTO;
     result.StatusCode = HttpStatusCode.Created;
-    return Results.Ok(result);
+    return Results.CreatedAtRoute("GetProperty", new { id=  property.IdPropiedad}, result);
 
-}).WithName("PostProperty").Accepts<PropertyCreateDTO>("application/json").Produces<APIResponse>(201).Produces(400);
+}).WithName("PostProperty").Accepts<PropertyCreateDTO>("application/json").Produces<APIResponse>(201).Produces<APIResponse>(400);
 
 app.MapPut("/api/Properties", async (PropertiesDBContext _db, IMapper mapper, IValidator<PropertyUpdateDTO> validation, [FromBody] PropertyUpdateDTO propertyUpdateDTO) =>
 {
@@ -105,17 +120,17 @@ app.MapPut("/api/Properties", async (PropertiesDBContext _db, IMapper mapper, IV
     if (!resultValidations.IsValid)
     {
         result.Success = false;
-        result.Errors.Add(resultValidations.Errors.FirstOrDefault().ToString());
+        result.Errors.Add(resultValidations?.Errors?.FirstOrDefault()?.ToString() ?? "");
         result.StatusCode = HttpStatusCode.BadRequest;
         return Results.BadRequest(result);
     }
 
-    Property propertyBD = await _db.Property.FirstOrDefaultAsync(prpt => prpt.IdPropiedad == propertyUpdateDTO.IdPropiedad);
+    Property? propertyBD = await _db.Property.FirstOrDefaultAsync(prpt => prpt.IdPropiedad == propertyUpdateDTO.IdPropiedad);
 
     if(propertyBD == null)
     {
         result.Success = false;
-        result.Errors.Add("No se encontro ninguna propiedad con ese ID");
+        result.Errors.Add("No property was found");
         result.StatusCode = HttpStatusCode.NotFound;
         return Results.NotFound(result);
     }
@@ -131,21 +146,29 @@ app.MapPut("/api/Properties", async (PropertiesDBContext _db, IMapper mapper, IV
 
     result.Success = true;
     result.Data = propertyDTO;
-    result.StatusCode = HttpStatusCode.Created;
+    result.StatusCode = HttpStatusCode.OK;
     return Results.Ok(result);
 
-}).WithName("PutProperty").Accepts<PropertyUpdateDTO>("application/json").Produces<APIResponse>(200).Produces(400).Produces(404);
+}).WithName("PutProperty").Accepts<PropertyUpdateDTO>("application/json").Produces<APIResponse>(200).Produces<APIResponse>(400).Produces<APIResponse>(404);
 
-app.MapDelete("/api/Propierties/{id:int}", async (PropertiesDBContext _db, [FromRoute] int id) =>
+app.MapDelete("/api/Properties/{id:int}", async (PropertiesDBContext _db, [FromRoute] int id) =>
 {
     APIResponse result = new APIResponse { Errors = [] };
 
-    Property propertyDB = await _db.Property.FirstOrDefaultAsync(prpt => prpt.IdPropiedad == id);
+    if(id <= 0)
+    {
+        result.Success = false;
+        result.Errors.Add("Invalid Id");
+        result.StatusCode = HttpStatusCode.BadRequest;
+        return Results.BadRequest(result);
+    }
+
+    Property? propertyDB = await _db.Property.FirstOrDefaultAsync(prpt => prpt.IdPropiedad == id);
 
     if (propertyDB == null)
     {
         result.Success = false;
-        result.Errors.Add("No se encontro ninguna propiedad con ese ID");
+        result.Errors.Add("No property was found");
         result.StatusCode = HttpStatusCode.NotFound;
         return Results.NotFound(result);
     }
@@ -153,11 +176,9 @@ app.MapDelete("/api/Propierties/{id:int}", async (PropertiesDBContext _db, [From
     _db.Remove(propertyDB);
     await _db.SaveChangesAsync();
 
-    result.Success = true;
-    result.StatusCode = HttpStatusCode.NoContent;
-    return Results.Ok(result);
+    return Results.NoContent();
 
-}).WithName("DeleteProperty").Produces<APIResponse>(204).Produces(400).Produces(404);
+}).WithName("DeleteProperty").Produces(204).Produces<APIResponse>(400).Produces<APIResponse>(404);
 
 app.UseHttpsRedirection();
 app.Run();
