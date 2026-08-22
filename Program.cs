@@ -1,13 +1,11 @@
 using AutoMapper;
 using FluentValidation;
-using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PropiedadesMinimalAPI.Data;
 using PropiedadesMinimalAPI.Mapper;
 using PropiedadesMinimalAPI.Models;
 using PropiedadesMinimalAPI.Models.DTO;
-using PropiedadesMinimalAPI.Validaciones;
 using System.Net;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -71,6 +69,7 @@ app.MapGet("/api/Properties/{id:int}", async (PropertiesDBContext _db, IMapper m
 
     result.Success = true;
     result.Data = mapper.Map<PropertyDTO>(property);
+    result.StatusCode = HttpStatusCode.OK;
     return Results.Ok(result);
 }).WithName("GetProperty").Produces<APIResponse>(200).Produces<APIResponse>(400).Produces<APIResponse>(404);
 
