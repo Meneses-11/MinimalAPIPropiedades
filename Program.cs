@@ -49,7 +49,7 @@ app.MapGet("/api/Properties", async (PropertiesDBContext _db, IMapper mapper) =>
 
 app.MapGet("/api/Properties/{id:int}", async (PropertiesDBContext _db, IMapper mapper, [FromRoute] int id) =>
 {
-    APIResponse result = new APIResponse() { Errors = [] };
+    APIResponse result = new() { Errors = [] };
 
     if (id <= 0)
     {
@@ -76,14 +76,14 @@ app.MapGet("/api/Properties/{id:int}", async (PropertiesDBContext _db, IMapper m
 
 app.MapPost("/api/Properties", async (PropertiesDBContext _db, IMapper mapper, IValidator<PropertyCreateDTO> validation, [FromBody] PropertyCreateDTO propertyCreateDTO ) =>
 {
-    APIResponse result = new APIResponse() { Errors = [] };
+    APIResponse result = new() { Errors = [] };
 
     var resultValidations = await validation.ValidateAsync(propertyCreateDTO);
 
     if (!resultValidations.IsValid)
     {
         result.Success = false;
-        result.Errors.Add(resultValidations?.Errors?.FirstOrDefault()?.ToString() ?? "");
+        result.Errors.AddRange(resultValidations.Errors.Select(errs => errs.ErrorMessage));
         result.StatusCode = HttpStatusCode.BadRequest;
         return Results.BadRequest(result);
     }
@@ -97,7 +97,7 @@ app.MapPost("/api/Properties", async (PropertiesDBContext _db, IMapper mapper, I
     }
 
     Property property = mapper.Map<Property>(propertyCreateDTO);
-    property.FechaCreacion = DateTime.Now;
+    property.FechaCreacion = DateTime.UtcNow;
 
     await _db.Property.AddAsync(property);
     await _db.SaveChangesAsync();
@@ -113,14 +113,14 @@ app.MapPost("/api/Properties", async (PropertiesDBContext _db, IMapper mapper, I
 
 app.MapPut("/api/Properties", async (PropertiesDBContext _db, IMapper mapper, IValidator<PropertyUpdateDTO> validation, [FromBody] PropertyUpdateDTO propertyUpdateDTO) =>
 {
-    APIResponse result = new APIResponse() { Errors = [] };
+    APIResponse result = new() { Errors = [] };
 
     var resultValidations = await validation.ValidateAsync(propertyUpdateDTO);
 
     if (!resultValidations.IsValid)
     {
         result.Success = false;
-        result.Errors.Add(resultValidations?.Errors?.FirstOrDefault()?.ToString() ?? "");
+        result.Errors.AddRange(resultValidations.Errors.Select(errs => errs.ErrorMessage));
         result.StatusCode = HttpStatusCode.BadRequest;
         return Results.BadRequest(result);
     }
@@ -153,7 +153,7 @@ app.MapPut("/api/Properties", async (PropertiesDBContext _db, IMapper mapper, IV
 
 app.MapDelete("/api/Properties/{id:int}", async (PropertiesDBContext _db, [FromRoute] int id) =>
 {
-    APIResponse result = new APIResponse { Errors = [] };
+    APIResponse result = new() { Errors = [] };
 
     if(id <= 0)
     {
